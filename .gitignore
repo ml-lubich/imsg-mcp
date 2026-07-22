@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# Rust
+/rust/target/
+target/
+
+# Bench artifacts (results.md / results.svg are committed intentionally)
+/tmp/imsg_bench.db
+
+# macOS
+.DS_Store

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "imsg"
+version = "0.1.0"
+description = "Fast, local iMessage for your terminal + MCP — Rust-accelerated read/search, AppleScript send. macOS only."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "ml-lubich" }]
+keywords = ["imessage", "macos", "mcp", "cli", "rust", "applescript"]
+classifiers = [
+    "Environment :: MacOS X",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Rust",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "mcp[cli]>=1.6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/ml-lubich/imsg"
+Repository = "https://github.com/ml-lubich/imsg"
+
+[project.scripts]
+imsg = "imessage_mcp.main:app"
+imsg-mcp = "imessage_mcp.server:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[tool.maturin]
+# Rust extension (imsgcore) lives in ./rust; Python package sits alongside it.
+manifest-path = "rust/Cargo.toml"
+module-name = "imsgcore"
+python-source = "."
+python-packages = ["imessage_mcp"]
+features = ["pyo3/extension-module"]

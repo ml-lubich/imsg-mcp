@@ -1,0 +1,53 @@
+{
+  "updatedAt": "2026-07-22T21:17:04.292Z",
+  "missions": [
+    {
+      "id": "session:f808460f-460c-4aa4-a23e-b2a51b52d101:none",
+      "source": "session",
+      "name": "none",
+      "objective": "Session mission",
+      "createdAt": "2026-07-22T21:12:09.894Z",
+      "updatedAt": "2026-07-22T21:17:04.292Z",
+      "status": "done",
+      "workerCount": 1,
+      "taskCounts": {
+        "total": 1,
+        "pending": 0,
+        "blocked": 0,
+        "inProgress": 0,
+        "completed": 1,
+        "failed": 0
+      },
+      "agents": [
+        {
+          "name": "rustcore:arustco",
+          "role": "rustcore",
+          "ownership": "arustcore-481f0c2d98777410",
+          "status": "done",
+          "currentStep": null,
+          "latestUpdate": "completed",
+          "completedSummary": null,
+          "updatedAt": "2026-07-22T21:17:04.292Z"
+        }
+      ],
+      "timeline": [
+        {
+          "id": "session-start:arustcore-481f0c2d98777410:2026-07-22T21:12:09.894Z",
+          "at": "2026-07-22T21:12:09.894Z",
+          "kind": "update",
+          "agent": "rustcore:arustco",
+          "detail": "started rustcore:arustco",
+          "sourceKey": "session-start:arustcore-481f0c2d98777410"
+        },
+        {
+          "id": "session-stop:arustcore-481f0c2d98777410:2026-07-22T21:17:04.292Z",
+          "at": "2026-07-22T21:17:04.292Z",
+          "kind": "completion",
+          "agent": "rustcore:arustco",
+          "detail": "completed",
+          "sourceKey": "session-stop:arustcore-481f0c2d98777410"
+        }
+      ]
+    }
+  ]
+}
