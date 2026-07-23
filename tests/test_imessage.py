@@ -64,6 +64,15 @@ def test_list_chats(synthetic_db: Path):
     assert chats and chats[0].identifier.startswith("chat")
 
 
+def test_list_contacts_and_query(synthetic_db: Path):
+    all_contacts = imessage.list_contacts(path=synthetic_db, limit=100)
+    assert all_contacts
+    handle = all_contacts[0].handle
+    needle = handle[:3]
+    filtered = imessage.list_contacts(path=synthetic_db, limit=100, query=needle)
+    assert filtered and all(needle.lower() in c.handle.lower() for c in filtered)
+
+
 def test_missing_db_raises_access_error(tmp_path: Path):
     with pytest.raises(imessage.AccessError):
         imessage.list_chats(path=tmp_path / "nope.db")

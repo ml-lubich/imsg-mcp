@@ -146,9 +146,34 @@ fn list_chats(
 }
 
 #[pyfunction]
-#[pyo3(signature = (db_path, limit=100))]
-fn list_contacts(db_path: String, limit: i64) -> PyResult<Vec<(String, Option<String>)>> {
+#[pyo3(signature = (db_path, limit=100, query=None))]
+fn list_contacts(
+    db_path: String,
+    limit: i64,
+    query: Option<String>,
+) -> PyResult<Vec<(String, Option<String>)>> {
     let conn = open_ro(&db_path)?;
+    let needle = query
+        .as_ref()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
+    if let Some(q) = needle {
+        let pattern = format!("%{q}%");
+        let mut stmt = conn
+            .prepare(
+                "SELECT DISTINCT id, service FROM handle \
+                 WHERE id LIKE ?1 COLLATE NOCASE ORDER BY id LIMIT ?2",
+            )
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        let rows = stmt
+            .query_map(rusqlite::params![pattern, limit], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+            })
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+        return rows
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(|e| PyRuntimeError::new_err(e.to_string()));
+    }
     let mut stmt = conn
         .prepare("SELECT DISTINCT id, service FROM handle ORDER BY id LIMIT ?")
         .map_err(|e| PyRuntimeError::new_err(e.to_string()))?;

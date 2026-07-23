@@ -65,17 +65,24 @@ brew install ml-lubich/tap/imsg
 
 Run `imsg doctor` to check access and see which engine (Rust or Python) is live.
 
+Specs live under [`docs/`](docs/) (overview, architecture, design, API, testing).
+
 ## CLI
 
 ```bash
+imsg -h                           # commands (also: imsg <cmd> -h)
 imsg doctor                       # check Full Disk Access + engine
 imsg chats                        # recent conversations + their ids
 imsg contacts                     # handles (numbers / emails) seen
+imsg contacts -q 415              # filter handles by substring
 imsg read -c +14155551234         # recent messages with a contact
 imsg read --chat 42 --limit 100   # a specific conversation
 imsg search "dinner"              # search message text
 imsg send +14155551234 "on my way"
 ```
+
+Every command accepts `-h` / `--help` with options, arguments, and examples
+(agent-friendly).
 
 ## MCP server
 

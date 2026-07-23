@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "imsg": {
+      "command": "imsg-mcp"
+    }
+  }
+}

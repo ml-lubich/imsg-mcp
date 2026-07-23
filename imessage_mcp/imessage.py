@@ -178,17 +178,35 @@ def list_chats(limit: int = 20, path: Path | None = None) -> list[Chat]:
         conn.close()
 
 
-def list_contacts(limit: int = 100, path: Path | None = None) -> list[Contact]:
-    """Distinct handles (phone numbers / emails) seen in the message store."""
+def list_contacts(
+    limit: int = 100,
+    query: str | None = None,
+    path: Path | None = None,
+) -> list[Contact]:
+    """Distinct handles (phone numbers / emails) seen in the message store.
+
+    Optional `query` substring-filters handles (case-insensitive), e.g. a
+    partial phone number or email domain.
+    """
+    needle = (query or "").strip() or None
     if _RUST is not None:
-        rows = _via_rust(lambda: _RUST.list_contacts(str(path or db_path()), limit))
+        rows = _via_rust(
+            lambda: _RUST.list_contacts(str(path or db_path()), limit, needle)
+        )
         return [Contact(*r) for r in rows]
     conn = _connect(path)
     try:
-        cur = conn.execute(
-            "SELECT DISTINCT id, service FROM handle ORDER BY id LIMIT ?",
-            (limit,),
-        )
+        if needle:
+            cur = conn.execute(
+                "SELECT DISTINCT id, service FROM handle "
+                "WHERE id LIKE ? COLLATE NOCASE ORDER BY id LIMIT ?",
+                (f"%{needle}%", limit),
+            )
+        else:
+            cur = conn.execute(
+                "SELECT DISTINCT id, service FROM handle ORDER BY id LIMIT ?",
+                (limit,),
+            )
         return [Contact(r[0], r[1]) for r in _rows(cur)]
     finally:
         conn.close()
