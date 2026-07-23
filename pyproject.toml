@@ -3,8 +3,8 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "imsg"
-version = "0.1.0"
+name = "mac-imsg"
+version = "0.1.1"
 description = "Fast, local iMessage for your terminal + MCP — Rust-accelerated read/search, AppleScript send. macOS only."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,3 +42,4 @@ module-name = "imsgcore"
 python-source = "."
 python-packages = ["imessage_mcp"]
 features = ["pyo3/extension-module"]
+include = ["LICENSE"]

@@ -1,7 +1,7 @@
 # imsg — fast, local iMessage for your terminal & MCP
 
-[![PyPI](https://img.shields.io/pypi/v/imsg.svg)](https://pypi.org/project/imsg/)
-[![Python](https://img.shields.io/pypi/pyversions/imsg.svg)](https://pypi.org/project/imsg/)
+[![PyPI](https://img.shields.io/pypi/v/mac-imsg.svg)](https://pypi.org/project/mac-imsg/)
+[![Python](https://img.shields.io/pypi/pyversions/mac-imsg.svg)](https://pypi.org/project/mac-imsg/)
 [![Built with Rust](https://img.shields.io/badge/core-Rust-orange.svg)](rust/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![macOS only](https://img.shields.io/badge/os-macOS-black.svg)](#requirements)
@@ -45,10 +45,12 @@ messages whose text lives in an `attributedBody` blob — which a plain
 
 ```bash
 # with uv (recommended) — provisions Python + the prebuilt wheel
-uv tool install imsg
+# PyPI package name is mac-imsg (imsg was too similar to an existing project);
+# the installed CLIs are still `imsg` and `imsg-mcp`.
+uv tool install mac-imsg
 
 # or pip
-pip install imsg
+pip install mac-imsg
 
 # or Homebrew
 brew install ml-lubich/tap/imsg

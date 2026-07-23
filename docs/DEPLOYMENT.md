@@ -2,7 +2,7 @@
 
 ## Distribution channels
 
-1. **PyPI** — `pip install imsg` / `uv tool install imsg` (wheels + sdist)
+1. **PyPI** — `pip install mac-imsg` / `uv tool install mac-imsg` (CLIs remain `imsg` / `imsg-mcp`; the `imsg` name is blocked on PyPI as too similar to another project)
 2. **Homebrew** — `brew install ml-lubich/tap/imsg` (formula in `homebrew-tap`)
 3. **From source** — `maturin develop` + `uv pip install -e ".[dev]"`
 

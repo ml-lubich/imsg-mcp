@@ -12,8 +12,8 @@ sends go through Messages.app via AppleScript.
 ## Install
 
 ```bash
-uv tool install imsg          # recommended
-pip install imsg
+uv tool install mac-imsg      # recommended (CLIs: imsg, imsg-mcp)
+pip install mac-imsg
 brew install ml-lubich/tap/imsg
 ```
 
