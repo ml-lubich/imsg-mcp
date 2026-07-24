@@ -1,6 +1,6 @@
 """imsg: fast, local iMessage access (Rust-accelerated) with CLI + MCP server."""
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 # True when the compiled Rust core (imsgcore) is importable; the pure-Python
 # path in imessage.py is used otherwise. Exposed so `imsg doctor` / benchmarks

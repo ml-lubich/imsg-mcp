@@ -8,9 +8,11 @@ Agent tip: run `imsg -h` then `imsg <command> -h` for options, args, and example
 """
 from __future__ import annotations
 
+import json
+
 import typer
 
-from imessage_mcp import __version__, imessage, ui
+from imessage_mcp import __version__, agent, imessage, ui
 
 # Leading \b tells Click not to rewrap this paragraph (keeps examples agent-readable).
 _APP_EPILOG = """
@@ -316,6 +318,27 @@ def send(
 def version() -> None:
     """Print the installed package version."""
     ui.console.print(f"imsg {__version__}")
+
+
+agent_app = typer.Typer(
+    name="agent",
+    help="Machine-readable schema and playbook for LLM/automation use.",
+    no_args_is_help=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+app.add_typer(agent_app, name="agent")
+
+
+@agent_app.command("schema")
+def agent_schema_cmd() -> None:
+    """Print JSON schema of every stable command + params."""
+    typer.echo(json.dumps(agent.build_schema(), indent=2))
+
+
+@agent_app.command("guide")
+def agent_guide_cmd() -> None:
+    """Print a short markdown playbook for LLM agents."""
+    typer.echo(agent.build_guide(), nl=False)
 
 
 if __name__ == "__main__":  # pragma: no cover
