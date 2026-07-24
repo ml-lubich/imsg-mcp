@@ -3,9 +3,9 @@ requires = ["maturin>=1.7,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "mac-imsg"
+name = "imsg-client"
 version = "0.1.2"
-description = "Fast, local iMessage for your terminal + MCP — Rust-accelerated read/search, AppleScript send. macOS only."
+description = "imsg-client — local iMessage CLI + MCP (imsg / imsg-mcp). Typer, agent schema. macOS"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

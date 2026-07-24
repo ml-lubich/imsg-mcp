@@ -1,5 +1,8 @@
 # imsg — fast, local iMessage for your terminal & MCP
 
+**Package brand:** `imsg-client` · **CLI/MCP:** `imsg` / `imsg-mcp` · **PyPI today:** `pip install mac-imsg` (target rename: `imsg-client`).
+
+
 [![PyPI](https://img.shields.io/pypi/v/mac-imsg.svg)](https://pypi.org/project/mac-imsg/)
 [![Python](https://img.shields.io/pypi/pyversions/mac-imsg.svg)](https://pypi.org/project/mac-imsg/)
 [![Built with Rust](https://img.shields.io/badge/core-Rust-orange.svg)](rust/)
