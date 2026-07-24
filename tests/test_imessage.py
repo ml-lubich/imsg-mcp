@@ -113,3 +113,29 @@ def test_send_message_raises_on_osascript_failure(monkeypatch):
     )
     with pytest.raises(RuntimeError, match="boom"):
         imessage.send_message("+1", "hi")
+
+
+def test_dataclass_dict_helpers():
+    chat = imessage.Chat(1, "id", "name", "iMessage")
+    msg = imessage.Message("t", "+1", False, "2020", "iMessage", False)
+    contact = imessage.Contact("+1", "iMessage")
+    assert chat.dict()["identifier"] == "id"
+    assert msg.dict()["text"] == "t"
+    assert contact.dict()["handle"] == "+1"
+
+
+def test_decode_attributed_body_empty_payload_after_marker():
+    # NSString marker present but no length bytes follow
+    blob = b"NSString" + b"\x00" * 5
+    assert imessage._decode_attributed_body(blob) is None
+
+
+def test_decode_attributed_body_two_byte_length_too_short():
+    blob = b"NSString" + b"\x00" * 5 + bytes([0x81, 0x05])
+    assert imessage._decode_attributed_body(blob) is None
+
+
+def test_read_messages_filter_by_chat_id(synthetic_db: Path):
+    chat_id = imessage.list_chats(path=synthetic_db, limit=1)[0].chat_id
+    msgs = imessage.read_messages(chat_id=chat_id, path=synthetic_db, limit=10)
+    assert msgs

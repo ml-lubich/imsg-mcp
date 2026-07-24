@@ -121,3 +121,107 @@ def test_read_access_error_exits_nonzero(monkeypatch):
     monkeypatch.setattr(imessage, "read_messages", boom)
     result = runner.invoke(main.app, ["read"])
     assert result.exit_code == 1
+
+
+def test_help_unknown_command_exits_nonzero():
+    result = runner.invoke(main.app, ["help", "not-a-command"])
+    assert result.exit_code == 1
+    assert "unknown command" in result.stdout
+
+
+def test_chats_empty_list(monkeypatch):
+    monkeypatch.setattr(imessage, "list_chats", lambda limit=20: [])
+    result = runner.invoke(main.app, ["chats"])
+    assert result.exit_code == 0
+    assert "(no chats)" in result.stdout
+
+
+def test_chats_access_error(monkeypatch):
+    def boom(limit=20):
+        raise imessage.AccessError("denied")
+
+    monkeypatch.setattr(imessage, "list_chats", boom)
+    result = runner.invoke(main.app, ["chats"])
+    assert result.exit_code == 1
+
+
+def test_contacts_empty_without_query(monkeypatch):
+    monkeypatch.setattr(imessage, "list_contacts", lambda limit=100, query=None: [])
+    result = runner.invoke(main.app, ["contacts"])
+    assert result.exit_code == 0
+    assert "(no contacts)" in result.stdout
+
+
+def test_contacts_empty_with_query(monkeypatch):
+    monkeypatch.setattr(imessage, "list_contacts", lambda limit=100, query="zzz": [])
+    result = runner.invoke(main.app, ["contacts", "-q", "zzz"])
+    assert result.exit_code == 0
+    assert "matching 'zzz'" in result.stdout
+
+
+def test_contacts_access_error(monkeypatch):
+    def boom(limit=100, query=None):
+        raise imessage.AccessError("denied")
+
+    monkeypatch.setattr(imessage, "list_contacts", boom)
+    result = runner.invoke(main.app, ["contacts"])
+    assert result.exit_code == 1
+
+
+def test_read_renders_messages(monkeypatch):
+    monkeypatch.setattr(
+        imessage, "read_messages",
+        lambda contact=None, chat_id=None, limit=20: [
+            imessage.Message("hello", "+1", False, "2020-01-01", "iMessage", False),
+            imessage.Message(
+                text=None,
+                sender="+1",
+                is_from_me=False,
+                date="2020-01-02",
+                service="iMessage",
+                has_attachment=True,
+            ),
+        ],
+    )
+    result = runner.invoke(main.app, ["read"])
+    assert result.exit_code == 0
+    assert "hello" in result.stdout
+    assert "2020-01-02" in result.stdout
+
+
+def test_read_empty_messages(monkeypatch):
+    monkeypatch.setattr(imessage, "read_messages", lambda **kwargs: [])
+    result = runner.invoke(main.app, ["read"])
+    assert result.exit_code == 0
+    assert "(no messages)" in result.stdout
+
+
+def test_search_renders(monkeypatch):
+    monkeypatch.setattr(
+        imessage, "search_all",
+        lambda query, limit=20: [
+            imessage.Message("dinner", "me", True, "2020-01-01", "iMessage", False)
+        ],
+    )
+    result = runner.invoke(main.app, ["search", "dinner"])
+    assert result.exit_code == 0
+    assert "dinner" in result.stdout
+
+
+def test_search_access_error(monkeypatch):
+    def boom(query, limit=20):
+        raise imessage.AccessError("denied")
+
+    monkeypatch.setattr(imessage, "search_all", boom)
+    result = runner.invoke(main.app, ["search", "x"])
+    assert result.exit_code == 1
+
+
+def test_send_failure_exits_nonzero(monkeypatch):
+    def boom(r, t):
+        raise RuntimeError("Messages.app refused")
+
+    monkeypatch.setattr(imessage, "send_message", boom)
+    result = runner.invoke(main.app, ["send", "+1", "hi"])
+    assert result.exit_code == 1
+    assert "refused" in result.stdout

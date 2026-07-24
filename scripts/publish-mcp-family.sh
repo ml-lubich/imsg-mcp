@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Retry publishing *-client / wa-mcp after PyPI new-project rate limit clears.
+# Retry publishing *-mcp / wa-mcp after PyPI new-project rate limit clears.
 set -euo pipefail
 TOKEN="${UV_PUBLISH_TOKEN:-$(python3 -c "import configparser;c=configparser.ConfigParser();c.read('$HOME/.pypirc');print(c['pypi']['password'])")}"
 export UV_PUBLISH_TOKEN="$TOKEN"
