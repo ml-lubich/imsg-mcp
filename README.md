@@ -14,6 +14,11 @@ Cursor, VS Code, or any MCP client. Everything runs **locally on your Mac**:
 no cloud, no login, no account. Reads open `~/Library/Messages/chat.db`
 **read-only**; sends go through Messages.app.
 
+**macOS only.** iMessage lives in Apple's local `chat.db` and Messages.app —
+there is no official API and no equivalent on Linux or Windows, so `imsg`
+only runs on macOS. See [Requirements](#requirements) for the Full Disk
+Access setup every install needs.
+
 **Why another one?** The hot path — decoding tens of thousands of
 `attributedBody` typedstream blobs — is written in **Rust** (PyO3 + rusqlite),
 so reads and searches over a large history are several times faster than the
@@ -46,27 +51,41 @@ messages whose text lives in an `attributedBody` blob — which a plain
 
 ## Install
 
-```bash
-# with uv (recommended) — provisions Python + the prebuilt wheel
-# PyPI package name is mac-imsg (imsg was too similar to an existing project);
-# the installed CLIs are still `imsg` and `imsg-mcp`.
-uv tool install mac-imsg
+`imsg` is **macOS-only**. Pick one:
 
-# or pip
+```bash
+# Homebrew
+brew install ml-lubich/tap/imsg
+
+# pip
 pip install mac-imsg
 
-# or Homebrew
-brew install ml-lubich/tap/imsg
+# uv (recommended) — provisions Python + the prebuilt wheel
+uv tool install mac-imsg
+
+# from a clone, building the Rust core yourself
+git clone https://github.com/ml-lubich/imsg.git && cd imsg
+uv tool install .
 ```
+
+> The PyPI package is `mac-imsg` — `imsg-mcp` (the eventual target name) was
+> already registered when this shipped. The installed commands are always
+> `imsg` and `imsg-mcp`, regardless of package name.
 
 ## Requirements
 
-- **macOS** (reads the local Messages database; sends via Messages.app).
-- **Full Disk Access** for the app that runs `imsg` — Terminal/iTerm/Ghostty
-  for the CLI, or your MCP client (Claude Desktop, Cursor, VS Code…) for the
-  server. System Settings → Privacy & Security → Full Disk Access → add it,
-  then fully quit and reopen it.
-- Messages.app signed in and able to send a normal message.
+- **macOS.** Reads live at `~/Library/Messages/chat.db`; sends go through
+  Messages.app AppleScript. Neither exists on Linux or Windows, so there's no
+  cross-platform build.
+- **Full Disk Access** for whichever app runs `imsg`:
+  1. System Settings → Privacy & Security → Full Disk Access.
+  2. Add the app that will run it — your terminal (Terminal/iTerm/Ghostty)
+     for the CLI, or your MCP client (Claude Desktop, Cursor, VS Code, Claude
+     Code) for the server.
+  3. Fully quit and reopen that app — the permission doesn't take effect
+     until relaunch.
+- **Messages.app** signed in and able to send a normal message (only needed
+  for `imsg send`).
 
 Run `imsg doctor` to check access and see which engine (Rust or Python) is live.
 
@@ -84,10 +103,13 @@ imsg read -c +14155551234         # recent messages with a contact
 imsg read --chat 42 --limit 100   # a specific conversation
 imsg search "dinner"              # search message text
 imsg send +14155551234 "on my way"
+imsg version                      # installed package version
+imsg agent schema                 # JSON schema of every stable command
+imsg agent guide                  # markdown playbook for LLM agents
 ```
 
 Every command accepts `-h` / `--help` with options, arguments, and examples
-(agent-friendly).
+(agent-friendly); `imsg help <command>` prints the same thing.
 
 ## MCP server
 
