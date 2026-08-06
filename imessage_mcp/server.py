@@ -68,6 +68,50 @@ def list_contacts(limit: int = 100, query: str | None = None) -> list[dict]:
 
 
 @mcp.tool()
+def list_attachments(
+    contact: str | None = None,
+    chat_id: int | None = None,
+    limit: int = 20,
+    kind: str | None = None,
+) -> list[dict]:
+    """List media/file attachments (images, audio, video, documents) newest first.
+
+    `kind` filters on the mime-type prefix, e.g. \"image\", \"audio\", \"video\".
+    Each row carries an absolute `filename` plus `exists`, which is False when
+    the file is iCloud-only or was pruned. Use `download_attachments` to copy
+    them somewhere you can open.
+    """
+    return [
+        a.dict()
+        for a in imessage.list_attachments(
+            contact=contact, chat_id=chat_id, limit=limit, kind=kind
+        )
+    ]
+
+
+@mcp.tool()
+def download_attachments(
+    dest_dir: str,
+    contact: str | None = None,
+    chat_id: int | None = None,
+    limit: int = 20,
+    kind: str | None = None,
+) -> list[str]:
+    """Copy matching attachments into `dest_dir` and return the written paths.
+
+    This is a local file copy out of ~/Library/Messages/Attachments — nothing is
+    fetched over the network. Existing files are never overwritten (colliding
+    names get -1, -2, …), and rows whose backing file is missing are skipped.
+    """
+    return [
+        str(p)
+        for p in imessage.download_attachments(
+            dest_dir, contact=contact, chat_id=chat_id, limit=limit, kind=kind
+        )
+    ]
+
+
+@mcp.tool()
 def send_message(recipient: str, text: str) -> str:
     """Send an iMessage/SMS to a handle (phone number or email). Has a side
     effect: delivers a real message via Messages.app. Prefer a handle from

@@ -45,6 +45,11 @@ def build(path: Path, n_messages: int = 50_000, blob_fraction: float = 0.7) -> P
                               cache_has_attachments INTEGER);
         CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
         CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);
+        CREATE TABLE attachment (ROWID INTEGER PRIMARY KEY, filename TEXT,
+                                 mime_type TEXT, transfer_name TEXT,
+                                 total_bytes INTEGER);
+        CREATE TABLE message_attachment_join (message_id INTEGER,
+                                              attachment_id INTEGER);
         """
     )
     handles = [(i, f"+1415555{i:04d}", "iMessage") for i in range(1, 21)]
@@ -72,6 +77,27 @@ def build(path: Path, n_messages: int = 50_000, blob_fraction: float = 0.7) -> P
         joins.append(((i % 10) + 1, i))
     conn.executemany("INSERT INTO message VALUES (?,?,?,?,?,?,?,?)", msgs)
     conn.executemany("INSERT INTO chat_message_join VALUES (?,?)", joins)
+
+    # Every 10th message carries an attachment backed by a real file on disk, so
+    # tests can exercise copying. The last one is intentionally left dangling
+    # (row present, file absent) to cover the missing-source path.
+    media_dir = path.parent / "Attachments"
+    media_dir.mkdir(exist_ok=True)
+    attach_msgs = [i for i in range(1, n_messages + 1) if i % 10 == 0]
+    attachments, ajoins = [], []
+    for n, msg_id in enumerate(attach_msgs, start=1):
+        kind = ("jpeg", "image/jpeg") if n % 2 else ("caf", "audio/x-caf")
+        name = f"media_{n}.{kind[0]}"
+        f = media_dir / name
+        if n != len(attach_msgs):  # leave the final one dangling
+            f.write_bytes(b"\xff\xd8\xff" + name.encode())
+        attachments.append((n, str(f), kind[1], name, f.stat().st_size if f.exists() else 0))
+        ajoins.append((msg_id, n))
+        conn.execute(
+            "UPDATE message SET cache_has_attachments = 1 WHERE ROWID = ?", (msg_id,)
+        )
+    conn.executemany("INSERT INTO attachment VALUES (?,?,?,?,?)", attachments)
+    conn.executemany("INSERT INTO message_attachment_join VALUES (?,?)", ajoins)
     conn.commit()
     conn.close()
     return path

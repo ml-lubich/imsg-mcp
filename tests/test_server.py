@@ -76,3 +76,33 @@ def test_main_invokes_mcp_run(monkeypatch):
     monkeypatch.setattr(server.mcp, "run", lambda: called.__setitem__("n", called["n"] + 1))
     server.main()
     assert called["n"] == 1
+
+
+def test_list_attachments_tool(monkeypatch):
+    monkeypatch.setattr(
+        imessage, "list_attachments",
+        lambda contact=None, chat_id=None, limit=20, kind=None: [
+            imessage.Attachment(
+                message_id=7, chat_id=2, filename="/tmp/x/clip.caf",
+                mime_type="audio/x-caf", transfer_name="clip.caf", total_bytes=99,
+                date="2026-08-04T10:00:00", is_from_me=False, sender="+1",
+                exists=True,
+            )
+        ],
+    )
+    rows = server.list_attachments(kind="audio", limit=5)
+    assert rows[0]["transfer_name"] == "clip.caf"
+    assert rows[0]["mime_type"] == "audio/x-caf"
+    assert rows[0]["exists"] is True
+
+
+def test_download_attachments_tool(monkeypatch):
+    from pathlib import Path
+
+    monkeypatch.setattr(
+        imessage, "download_attachments",
+        lambda d, contact=None, chat_id=None, limit=20, kind=None: [Path(d) / "clip.caf"],
+    )
+    out = server.download_attachments("/tmp/dest", kind="audio")
+    assert out == ["/tmp/dest/clip.caf"]
+    assert all(isinstance(p, str) for p in out)

@@ -28,6 +28,8 @@ Examples:
   imsg contacts -q 415
   imsg read -c +14155551234 --limit 20
   imsg search "dinner" --limit 10
+  imsg attachments -c +14155551234 --kind image
+  imsg download -c +14155551234 -k image -o ~/Desktop/media
   imsg send +14155551234 "on my way"
 """
 
@@ -64,6 +66,10 @@ Commands:
   read [-c HANDLE] [--chat ID] [-n N]
                           recent messages (handles from contacts)
   search QUERY [-n N]     full-history search (incl. rich-text blobs)
+  attachments [-c H] [--chat ID] [-k KIND] [-n N]
+                          list media/file attachments with on-disk paths
+  download -o DIR [-c H] [--chat ID] [-k KIND] [-n N]
+                          copy media/audio/video/files out to DIR
   send RECIPIENT TEXT     send via Messages.app (side effect)
   version                 print package version
 
@@ -73,10 +79,14 @@ Examples:
   imsg read -c +14155551234 --limit 20
   imsg read --chat 42
   imsg search "dinner" --limit 10
+  imsg attachments -c +14155551234 --kind image
+  imsg download -c +14155551234 -k image -o ~/Desktop/media
   imsg send +14155551234 "on my way"
 
+KIND is a mime-type prefix: image, audio, video, application.
+
 MCP tools: check_access, list_chats, list_contacts, get_recent_messages,
-           search_messages, send_message
+           search_messages, list_attachments, download_attachments, send_message
 """
 
 
@@ -104,6 +114,15 @@ def help_cmd(
                 typer.echo(sub.get_help(sub_ctx))
         return
     typer.echo(_AGENT_HELP)
+
+
+def _human_bytes(n: int) -> str:
+    size = float(n)
+    for unit in ("B", "KB", "MB", "GB"):
+        if size < 1024 or unit == "GB":
+            return f"{size:.0f}{unit}" if unit == "B" else f"{size:.1f}{unit}"
+        size /= 1024
+    return f"{size:.1f}GB"  # pragma: no cover - unreachable, loop returns at GB
 
 
 def _render_messages(msgs: list[imessage.Message]) -> None:
@@ -312,6 +331,135 @@ def send(
     except (ValueError, RuntimeError) as exc:
         _fail(str(exc))
     ui.console.print(ui.badge("sent"), f"to {recipient}")
+
+
+@app.command(
+    epilog=(
+        "\b\n"
+        "Examples:\n"
+        "  imsg attachments -c +14155551234\n"
+        "  imsg attachments --chat 42 --kind image\n"
+        "  imsg attachments --kind audio --limit 50\n\n"
+        "Lists media/files only; use `imsg download` to copy them out.\n"
+        "MCP equivalent: tool `list_attachments`."
+    ),
+)
+def attachments(
+    contact: str | None = typer.Option(
+        None,
+        "--contact",
+        "-c",
+        help="Filter by contact handle (phone or email from `imsg contacts`).",
+    ),
+    chat_id: int | None = typer.Option(
+        None,
+        "--chat",
+        help="Filter by chat id (from `imsg chats`).",
+    ),
+    kind: str | None = typer.Option(
+        None,
+        "--kind",
+        "-k",
+        help="Filter by mime-type prefix: image, audio, video, application.",
+    ),
+    limit: int = typer.Option(
+        20,
+        "--limit",
+        "-n",
+        help="Max attachments to list (newest first).",
+        min=1,
+    ),
+) -> None:
+    """List media/file attachments (images, audio, video) with their paths."""
+    try:
+        rows = imessage.list_attachments(
+            contact=contact, chat_id=chat_id, limit=limit, kind=kind
+        )
+    except imessage.AccessError as exc:
+        _fail(str(exc))
+    if not rows:
+        ui.console.print("(no attachments)")
+        return
+    table = ui.styled_table(
+        "Attachments", ["when", "from", "name", "type", "size", "path"]
+    )
+    for a in rows:
+        table.add_row(
+            a.date or "?",
+            "me" if a.is_from_me else a.sender,
+            a.transfer_name,
+            a.mime_type or "?",
+            _human_bytes(a.total_bytes),
+            a.filename if a.exists else f"{a.filename} (missing)",
+        )
+    ui.console.print(table)
+    missing = sum(1 for a in rows if not a.exists)
+    ui.console.print(
+        f"[dim]{len(rows)} attachment(s)"
+        + (f", {missing} not on disk (iCloud-only or pruned)" if missing else "")
+        + " — copy with: imsg download -o <dir>[/dim]"
+    )
+
+
+@app.command(
+    epilog=(
+        "\b\n"
+        "Examples:\n"
+        "  imsg download -c +14155551234 -o ~/Desktop/media\n"
+        "  imsg download --chat 42 --kind image -o ./photos\n"
+        "  imsg download --kind audio -n 50 -o ./voice-memos\n\n"
+        "Copies from ~/Library/Messages/Attachments — nothing is fetched over\n"
+        "the network. Existing files are never overwritten (names get -1, -2).\n"
+        "MCP equivalent: tool `download_attachments`."
+    ),
+)
+def download(
+    out: str = typer.Option(
+        ...,
+        "--out",
+        "-o",
+        help="Destination directory (created if missing).",
+    ),
+    contact: str | None = typer.Option(
+        None,
+        "--contact",
+        "-c",
+        help="Filter by contact handle (phone or email from `imsg contacts`).",
+    ),
+    chat_id: int | None = typer.Option(
+        None,
+        "--chat",
+        help="Filter by chat id (from `imsg chats`).",
+    ),
+    kind: str | None = typer.Option(
+        None,
+        "--kind",
+        "-k",
+        help="Filter by mime-type prefix: image, audio, video, application.",
+    ),
+    limit: int = typer.Option(
+        20,
+        "--limit",
+        "-n",
+        help="Max attachments to copy (newest first).",
+        min=1,
+    ),
+) -> None:
+    """Download media/attachments (images, audio, video, files) to a folder."""
+    try:
+        saved = imessage.download_attachments(
+            out, contact=contact, chat_id=chat_id, limit=limit, kind=kind
+        )
+    except imessage.AccessError as exc:
+        _fail(str(exc))
+    except ValueError as exc:
+        _fail(str(exc))
+    if not saved:
+        ui.console.print("(nothing downloaded — no matching attachments on disk)")
+        return
+    for p in saved:
+        ui.console.print(ui.badge("sent"), str(p))
+    ui.console.print(f"[dim]{len(saved)} file(s) -> {out}[/dim]")
 
 
 @app.command(epilog="\b\nExample:\n  imsg version")

@@ -102,6 +102,9 @@ imsg contacts -q 415              # filter handles by substring
 imsg read -c +14155551234         # recent messages with a contact
 imsg read --chat 42 --limit 100   # a specific conversation
 imsg search "dinner"              # search message text
+imsg attachments -c +14155551234  # list media/files with on-disk paths
+imsg attachments -k audio         # only audio (image / video / application too)
+imsg download -k image -o ./media # copy media out to a folder
 imsg send +14155551234 "on my way"
 imsg version                      # installed package version
 imsg agent schema                 # JSON schema of every stable command
@@ -126,7 +129,18 @@ claude mcp add --transport stdio --scope user imsg -- imsg-mcp
 ```
 
 Tools exposed: `check_access`, `get_recent_messages`, `search_messages`,
-`list_chats`, `list_contacts`, `send_message` (the only one with a side effect).
+`list_chats`, `list_contacts`, `list_attachments`, `download_attachments`,
+`send_message` (the only one with a side effect).
+
+### Attachments
+
+`attachments` / `download` cover images, audio, video, and documents. Messages
+already keeps these on disk under `~/Library/Messages/Attachments`, so
+downloading is a local copy — nothing is fetched over the network. `--kind` is a
+mime-type prefix (`image`, `audio`, `video`, `application`). Existing files are
+never overwritten (colliding names become `-1`, `-2`, …), and rows whose backing
+file is missing — iCloud-only or pruned by Messages — are listed with `exists:
+false` and skipped on download rather than aborting the batch.
 
 ## How it works
 

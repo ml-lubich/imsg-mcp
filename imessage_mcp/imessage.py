@@ -145,6 +145,25 @@ class Contact:
         return asdict(self)
 
 
+@dataclass
+class Attachment:
+    """A media/file attachment, with `filename` resolved to an absolute path."""
+
+    message_id: int
+    chat_id: int | None
+    filename: str
+    mime_type: str
+    transfer_name: str  # original name as sent, used when saving
+    total_bytes: int
+    date: str | None
+    is_from_me: bool
+    sender: str
+    exists: bool  # False when the backing file was pruned or is iCloud-only
+
+    def dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 def _rows(cur) -> Iterable[tuple]:
     while True:
         row = cur.fetchone()
@@ -344,6 +363,128 @@ def search_all(query: str, limit: int = 100, path: Path | None = None) -> list[M
         return out
     finally:
         conn.close()
+
+
+def _expand_attachment_path(filename: str | None) -> Path | None:
+    """Resolve a chat.db `attachment.filename` to an absolute path.
+
+    Messages stores these as `~/Library/Messages/Attachments/...`, so the tilde
+    has to be expanded before the file can be read.
+    """
+    if not filename:
+        return None
+    return Path(filename).expanduser()
+
+
+def list_attachments(
+    contact: str | None = None,
+    chat_id: int | None = None,
+    limit: int = 20,
+    kind: str | None = None,
+    path: Path | None = None,
+) -> list[Attachment]:
+    """Attachments (images, audio, video, files) newest first.
+
+    `kind` filters on the mime-type prefix, e.g. "image", "audio", "video".
+    Attachments live on disk next to chat.db, so `download_attachments` is just
+    a copy — nothing is fetched over the network.
+    """
+    where, params = [], []
+    if contact:
+        where.append("h.id = ?")
+        params.append(contact)
+    if chat_id is not None:
+        where.append("cmj.chat_id = ?")
+        params.append(chat_id)
+    if kind:
+        where.append("a.mime_type LIKE ?")
+        params.append(f"{kind}%")
+    clause = f"WHERE {' AND '.join(where)}" if where else ""
+    params.append(limit)
+
+    conn = _connect(path)
+    try:
+        cur = conn.execute(
+            f"""
+            SELECT m.ROWID, cmj.chat_id, a.filename, a.mime_type, a.transfer_name,
+                   a.total_bytes, m.date, m.is_from_me, h.id
+            FROM attachment a
+            JOIN message_attachment_join maj ON maj.attachment_id = a.ROWID
+            JOIN message m ON m.ROWID = maj.message_id
+            LEFT JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+            LEFT JOIN handle h ON h.ROWID = m.handle_id
+            {clause}
+            ORDER BY m.date DESC
+            LIMIT ?
+            """,
+            params,
+        )
+        out: list[Attachment] = []
+        for row in _rows(cur):
+            (msg_id, cid, fname, mime, tname, nbytes, date, is_me, handle) = row
+            resolved = _expand_attachment_path(fname)
+            out.append(
+                Attachment(
+                    message_id=msg_id,
+                    chat_id=cid,
+                    filename=str(resolved) if resolved else "",
+                    mime_type=mime or "",
+                    transfer_name=tname or (resolved.name if resolved else ""),
+                    total_bytes=nbytes or 0,
+                    date=_apple_time_to_iso(date),
+                    is_from_me=bool(is_me),
+                    sender="me" if is_me else (handle or "unknown"),
+                    exists=bool(resolved and resolved.is_file()),
+                )
+            )
+        return out
+    finally:
+        conn.close()
+
+
+def _unique_dest(dest_dir: Path, name: str) -> Path:
+    """A non-colliding path in `dest_dir`, suffixing -1, -2, ... as needed."""
+    candidate = dest_dir / name
+    if not candidate.exists():
+        return candidate
+    stem, suffix = candidate.stem, candidate.suffix
+    n = 1
+    while (dest_dir / f"{stem}-{n}{suffix}").exists():
+        n += 1
+    return dest_dir / f"{stem}-{n}{suffix}"
+
+
+def download_attachments(
+    dest_dir: Path | str,
+    contact: str | None = None,
+    chat_id: int | None = None,
+    limit: int = 20,
+    kind: str | None = None,
+    path: Path | None = None,
+) -> list[Path]:
+    """Copy matching attachments into `dest_dir`; return the written paths.
+
+    Rows whose backing file is missing (Messages prunes them, or iCloud has not
+    downloaded them yet) are skipped rather than raising, so one gap does not
+    abort the batch.
+    """
+    import shutil
+
+    dest = Path(dest_dir).expanduser()
+    if dest.exists() and not dest.is_dir():
+        raise ValueError(f"destination is not a directory: {dest}")
+    dest.mkdir(parents=True, exist_ok=True)
+
+    written: list[Path] = []
+    for att in list_attachments(
+        contact=contact, chat_id=chat_id, limit=limit, kind=kind, path=path
+    ):
+        if not att.exists:
+            continue
+        target = _unique_dest(dest, att.transfer_name or Path(att.filename).name)
+        shutil.copy2(att.filename, target)
+        written.append(target)
+    return written
 
 
 def _osascript(script: str) -> None:
