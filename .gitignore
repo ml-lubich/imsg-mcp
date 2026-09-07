@@ -17,3 +17,9 @@ target/
 
 # macOS
 .DS_Store
+
+# OMC operational state. Runtime churn, not source.
+# .omc/skills is the documented exception: project-scoped skills are committable.
+.omc/
+!.omc/skills/
+!.omc/skills/**
