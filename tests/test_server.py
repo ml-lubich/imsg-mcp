@@ -37,7 +37,7 @@ def test_list_contacts_tool(monkeypatch):
         lambda limit=100, query=None: [imessage.Contact("+1", "iMessage")],
     )
     rows = server.list_contacts(limit=10, query="1")
-    assert rows == [{"handle": "+1", "service": "iMessage"}]
+    assert rows == [{"handle": "+1", "service": "iMessage", "name": None}]
 
 
 def test_get_recent_messages_tool(monkeypatch):

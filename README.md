@@ -99,6 +99,7 @@ imsg doctor                       # check Full Disk Access + engine
 imsg chats                        # recent conversations + their ids
 imsg contacts                     # handles (numbers / emails) seen
 imsg contacts -q 415              # filter handles by substring
+imsg contacts -q Heupler          # or by AddressBook display name
 imsg read -c +14155551234         # recent messages with a contact
 imsg read --chat 42 --limit 100   # a specific conversation
 imsg search "dinner"              # search message text
@@ -106,6 +107,7 @@ imsg attachments -c +14155551234  # list media/files with on-disk paths
 imsg attachments -k audio         # only audio (image / video / application too)
 imsg download -k image -o ./media # copy media out to a folder
 imsg send +14155551234 "on my way"
+imsg send "Joseph Heupler" "on my way"  # resolves to one contact, or errors
 imsg version                      # installed package version
 imsg agent schema                 # JSON schema of every stable command
 imsg agent guide                  # markdown playbook for LLM agents
@@ -131,6 +133,14 @@ claude mcp add --transport stdio --scope user imsg -- imsg-mcp
 Tools exposed: `check_access`, `get_recent_messages`, `search_messages`,
 `list_chats`, `list_contacts`, `list_attachments`, `download_attachments`,
 `send_message` (the only one with a side effect).
+
+### Contacts by name
+
+`-q` on `contacts` and a name argument to `send` both resolve against the
+local AddressBook (`~/Library/Application Support/AddressBook/Sources/*/AddressBook-v22.abcddb`),
+read directly and read-only — never via `osascript`/Contacts.app. `send`
+only goes through when a name resolves to exactly one contact; an ambiguous
+or unmatched name raises an error listing the candidates and sends nothing.
 
 ### Attachments
 

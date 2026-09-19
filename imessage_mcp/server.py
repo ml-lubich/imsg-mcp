@@ -58,11 +58,14 @@ def list_chats(limit: int = 20) -> list[dict]:
 
 @mcp.tool()
 def list_contacts(limit: int = 100, query: str | None = None) -> list[dict]:
-    """List contact handles (phone numbers / emails) from the message store.
+    """List contacts: handles (phone numbers / emails) from the message store,
+    plus AddressBook name matches for `query`.
 
-    Optional `query` substring-filters handles (case-insensitive), e.g. \"415\"
-    or \"@example.com\". Use returned handles with `get_recent_messages(contact=...)`
-    or `send_message(recipient=...)`.
+    `query` case-insensitively matches a handle substring (e.g. \"415\" or
+    \"@example.com\") OR a contact's display name (e.g. \"Heupler\") — read
+    straight from the local AddressBook, no Contacts.app automation needed.
+    Named matches carry `name`; use returned handles with
+    `get_recent_messages(contact=...)` or `send_message(recipient=...)`.
     """
     return [c.dict() for c in imessage.list_contacts(limit=limit, query=query)]
 
@@ -113,9 +116,11 @@ def download_attachments(
 
 @mcp.tool()
 def send_message(recipient: str, text: str) -> str:
-    """Send an iMessage/SMS to a handle (phone number or email). Has a side
-    effect: delivers a real message via Messages.app. Prefer a handle from
-    `list_contacts`."""
+    """Send an iMessage/SMS to a handle (phone number or email) or a contact
+    name. A name is resolved via AddressBook and only sent if it matches
+    exactly one contact — ambiguous or unmatched names raise an error and
+    nothing is sent. Has a side effect: delivers a real message via
+    Messages.app. Prefer a handle from `list_contacts` when in doubt."""
     imessage.send_message(recipient, text)
     return f"sent to {recipient}"
 

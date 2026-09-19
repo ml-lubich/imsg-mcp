@@ -13,6 +13,8 @@ Requirements at runtime:
 from __future__ import annotations
 
 import os
+import re
+import sqlite3
 import subprocess
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -23,6 +25,11 @@ from typing import Any, Iterable
 _APPLE_EPOCH = 978307200
 
 DEFAULT_DB = Path.home() / "Library" / "Messages" / "chat.db"
+
+# Per-account AddressBook stores live under Sources/<uuid>/AddressBook-v22.abcddb.
+DEFAULT_ADDRESSBOOK_SOURCES = (
+    Path.home() / "Library" / "Application Support" / "AddressBook" / "Sources"
+)
 
 try:  # Rust-accelerated core; falls back to pure Python when absent.
     import imsgcore as _RUST
@@ -40,8 +47,6 @@ def db_path() -> Path:
 
 
 def _connect(path: Path | None = None):
-    import sqlite3
-
     p = path or db_path()
     if not p.exists():
         raise AccessError(f"chat.db not found at {p}")
@@ -140,6 +145,7 @@ class Message:
 class Contact:
     handle: str  # phone number or email
     service: str | None
+    name: str | None = None  # set when resolved from AddressBook by name
 
     def dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -201,34 +207,189 @@ def list_contacts(
     limit: int = 100,
     query: str | None = None,
     path: Path | None = None,
+    addressbook_paths: list[Path] | None = None,
 ) -> list[Contact]:
-    """Distinct handles (phone numbers / emails) seen in the message store.
+    """Distinct handles (phone numbers / emails) seen in the message store,
+    plus any macOS AddressBook contacts whose display name matches `query`.
 
-    Optional `query` substring-filters handles (case-insensitive), e.g. a
-    partial phone number or email domain.
+    `query` matches case-insensitively against a contact's display name (read
+    straight from the local AddressBook SQLite store, no osascript) OR a
+    handle substring, e.g. a partial phone number or email domain. Name
+    matches are listed first, one row per handle, with `name` set; handle-only
+    matches keep the prior behavior (`name` is None).
     """
     needle = (query or "").strip() or None
+
+    named: list[Contact] = []
+    if needle:
+        for name, handles in find_contacts_by_name(needle, db_paths=addressbook_paths):
+            for h in handles:
+                named.append(Contact(handle=h, service=None, name=name))
+
     if _RUST is not None:
         rows = _via_rust(
             lambda: _RUST.list_contacts(str(path or db_path()), limit, needle)
         )
-        return [Contact(*r) for r in rows]
-    conn = _connect(path)
+        handle_contacts = [Contact(*r) for r in rows]
+    else:
+        conn = _connect(path)
+        try:
+            if needle:
+                cur = conn.execute(
+                    "SELECT DISTINCT id, service FROM handle "
+                    "WHERE id LIKE ? COLLATE NOCASE ORDER BY id LIMIT ?",
+                    (f"%{needle}%", limit),
+                )
+            else:
+                cur = conn.execute(
+                    "SELECT DISTINCT id, service FROM handle ORDER BY id LIMIT ?",
+                    (limit,),
+                )
+            handle_contacts = [Contact(r[0], r[1]) for r in _rows(cur)]
+        finally:
+            conn.close()
+
+    seen = {c.handle for c in named}
+    merged = named + [c for c in handle_contacts if c.handle not in seen]
+    return merged[:limit]
+
+
+def _addressbook_db_paths(base: Path | None = None) -> list[Path]:
+    """Every per-account AddressBook-v22.abcddb under Sources/*."""
+    root = base or DEFAULT_ADDRESSBOOK_SOURCES
+    if not root.exists():
+        return []
+    return sorted(root.glob("*/AddressBook-v22.abcddb"))
+
+
+def _normalize_phone(raw: str) -> str:
+    """Best-effort normalization to the `+1XXXXXXXXXX`-style form chat.db uses
+    for US handles, so an AddressBook number matches a `handle.id`.
+
+    ponytail: US/NANP heuristic (10 digits -> +1…, 11 starting with 1 -> +…);
+    a number that already has a country code (e.g. "+44 ...") passes through
+    with only punctuation stripped. Upgrade to a real E.164 library
+    (phonenumbers) if non-US numbers start mismatching chat.db handles.
+    """
+    if raw.strip().startswith("+"):
+        return "+" + re.sub(r"\D", "", raw)
+    digits = re.sub(r"\D", "", raw)
+    if not digits:
+        return raw.strip()
+    if len(digits) == 10:
+        return f"+1{digits}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+{digits}"
+    return f"+{digits}"
+
+
+def find_contacts_by_name(
+    name: str,
+    db_paths: list[Path] | None = None,
+) -> list[tuple[str, list[str]]]:
+    """Contacts whose display name contains `name` (case-insensitive substring),
+    read read-only straight from the macOS AddressBook SQLite store(s) — no
+    osascript against Contacts.app.
+
+    Returns a sorted list of `(full_name, handles)` pairs. `handles` are phone
+    numbers normalized to chat.db's `+1XXXXXXXXXX` form plus any emails,
+    deduplicated; a contact with no phone/email is omitted (it can't be a send
+    target). `db_paths` overrides discovery (used by tests with a fixture DB).
+    """
+    needle = name.strip().lower()
+    if not needle:
+        return []
+    paths = _addressbook_db_paths() if db_paths is None else db_paths
+    found: dict[str, list[str]] = {}
+    for db in paths:
+        if not Path(db).exists():
+            continue
+        try:
+            conn = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+        except sqlite3.OperationalError:
+            continue
+        try:
+            cur = conn.execute(
+                """
+                SELECT Z_PK, TRIM(COALESCE(ZFIRSTNAME,'') || ' ' || COALESCE(ZLASTNAME,''))
+                FROM ZABCDRECORD
+                WHERE LOWER(COALESCE(ZFIRSTNAME,'') || ' ' || COALESCE(ZLASTNAME,'')) LIKE ?
+                """,
+                (f"%{needle}%",),
+            )
+            for pk, full_name in cur.fetchall():
+                if not full_name:
+                    continue
+                handles = found.setdefault(full_name, [])
+                for (num,) in conn.execute(
+                    "SELECT ZFULLNUMBER FROM ZABCDPHONENUMBER WHERE ZOWNER = ?", (pk,)
+                ):
+                    if num:
+                        norm = _normalize_phone(num)
+                        if norm not in handles:
+                            handles.append(norm)
+                for (addr,) in conn.execute(
+                    "SELECT ZADDRESS FROM ZABCDEMAILADDRESS WHERE ZOWNER = ?", (pk,)
+                ):
+                    if addr and addr not in handles:
+                        handles.append(addr)
+        finally:
+            conn.close()
+    return sorted((n, h) for n, h in found.items() if h)
+
+
+def _pick_imessage_handle(handles: list[str], path: Path | None = None) -> str:
+    """Of a contact's handles, prefer one chat.db already knows as iMessage.
+
+    Falls back to the first handle when there's only one, chat.db isn't
+    readable, or none of them are known iMessage handles yet.
+    """
+    if len(handles) == 1:
+        return handles[0]
     try:
-        if needle:
-            cur = conn.execute(
-                "SELECT DISTINCT id, service FROM handle "
-                "WHERE id LIKE ? COLLATE NOCASE ORDER BY id LIMIT ?",
-                (f"%{needle}%", limit),
-            )
-        else:
-            cur = conn.execute(
-                "SELECT DISTINCT id, service FROM handle ORDER BY id LIMIT ?",
-                (limit,),
-            )
-        return [Contact(r[0], r[1]) for r in _rows(cur)]
+        conn = _connect(path)
+    except AccessError:
+        return handles[0]
+    try:
+        placeholders = ",".join("?" * len(handles))
+        cur = conn.execute(
+            f"SELECT id FROM handle WHERE service = 'iMessage' AND id IN ({placeholders})",
+            handles,
+        )
+        known = {r[0] for r in cur.fetchall()}
+        for h in handles:
+            if h in known:
+                return h
     finally:
         conn.close()
+    return handles[0]
+
+
+_HANDLE_RE = re.compile(r"^[\d+()\-.\s]+$")
+
+
+def resolve_recipient(
+    recipient: str,
+    path: Path | None = None,
+    addressbook_paths: list[Path] | None = None,
+) -> str:
+    """Resolve `recipient` to a single handle for `send_message`.
+
+    A phone number or email passes through unchanged. A display name is
+    resolved via the local AddressBook to exactly one contact's
+    iMessage-capable handle. Raises ValueError — never sends — when the name
+    matches zero or more than one contact, listing the candidates found.
+    """
+    if "@" in recipient or _HANDLE_RE.match(recipient.strip()):
+        return recipient
+    matches = find_contacts_by_name(recipient, db_paths=addressbook_paths)
+    if not matches:
+        raise ValueError(f"no contact matching {recipient!r}")
+    if len(matches) > 1:
+        candidates = "; ".join(f"{n} ({', '.join(h)})" for n, h in matches)
+        raise ValueError(f"ambiguous name {recipient!r}, matches: {candidates}")
+    name, handles = matches[0]
+    return _pick_imessage_handle(handles, path=path)
 
 
 def _message_from_rust(t: tuple) -> Message:
@@ -497,14 +658,24 @@ def _osascript(script: str) -> None:
         raise RuntimeError(proc.stderr.strip() or "osascript failed")
 
 
-def send_message(recipient: str, text: str) -> None:
+def send_message(
+    recipient: str,
+    text: str,
+    path: Path | None = None,
+    addressbook_paths: list[Path] | None = None,
+) -> None:
     """Send an iMessage/SMS to a handle (phone number or email) via Messages.app.
+
+    `recipient` may also be a contact name (e.g. "Joseph Heupler"); it is
+    resolved via `resolve_recipient` to exactly one handle before anything is
+    sent — an ambiguous or unmatched name raises ValueError and never sends.
 
     Tries the iMessage service first; Messages falls back to SMS for handles
     that aren't on iMessage when the account allows it.
     """
     if not recipient or not text:
         raise ValueError("recipient and text are required")
+    recipient = resolve_recipient(recipient, path=path, addressbook_paths=addressbook_paths)
     safe_text = text.replace("\\", "\\\\").replace('"', '\\"')
     safe_recip = recipient.replace("\\", "\\\\").replace('"', '\\"')
     script = f'''

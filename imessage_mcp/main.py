@@ -26,11 +26,13 @@ Agent-friendly discovery:
 Examples:
   imsg contacts --limit 50
   imsg contacts -q 415
+  imsg contacts -q Heupler
   imsg read -c +14155551234 --limit 20
   imsg search "dinner" --limit 10
   imsg attachments -c +14155551234 --kind image
   imsg download -c +14155551234 -k image -o ~/Desktop/media
   imsg send +14155551234 "on my way"
+  imsg send "Joseph Heupler" "on my way"
 """
 
 app = typer.Typer(
@@ -62,7 +64,8 @@ Discover:
 Commands:
   doctor                  check Full Disk Access + engine (rust/python)
   chats [-n N]            recent conversations (use id with read --chat)
-  contacts [-n N] [-q Q]  contact handles; filter with -q (phone/email substring)
+  contacts [-n N] [-q Q]  contact handles; -q matches phone/email substring
+                          OR an AddressBook display name (case-insensitive)
   read [-c HANDLE] [--chat ID] [-n N]
                           recent messages (handles from contacts)
   search QUERY [-n N]     full-history search (incl. rich-text blobs)
@@ -70,18 +73,22 @@ Commands:
                           list media/file attachments with on-disk paths
   download -o DIR [-c H] [--chat ID] [-k KIND] [-n N]
                           copy media/audio/video/files out to DIR
-  send RECIPIENT TEXT     send via Messages.app (side effect)
+  send RECIPIENT TEXT     send via Messages.app (side effect); RECIPIENT may
+                          be a handle or a name resolving to exactly one
+                          contact (ambiguous/no match errors, never sends)
   version                 print package version
 
 Examples:
   imsg contacts --limit 50
   imsg contacts -q 415
+  imsg contacts -q Heupler
   imsg read -c +14155551234 --limit 20
   imsg read --chat 42
   imsg search "dinner" --limit 10
   imsg attachments -c +14155551234 --kind image
   imsg download -c +14155551234 -k image -o ~/Desktop/media
   imsg send +14155551234 "on my way"
+  imsg send "Joseph Heupler" "on my way"
 
 KIND is a mime-type prefix: image, audio, video, application.
 
@@ -204,7 +211,8 @@ def chats(
         "  imsg contacts\n"
         "  imsg contacts --limit 200\n"
         "  imsg contacts -q 415\n"
-        "  imsg contacts -q @example.com\n\n"
+        "  imsg contacts -q @example.com\n"
+        "  imsg contacts -q Heupler          # match by AddressBook name\n\n"
         "Use a handle with `imsg read -c <handle>` or `imsg send <handle> \"...\"`.\n"
         "MCP equivalent: tool `list_contacts`."
     ),
@@ -221,10 +229,14 @@ def contacts(
         None,
         "--query",
         "-q",
-        help="Substring filter on handle (phone/email), case-insensitive.",
+        help=(
+            "Substring filter, case-insensitive: a handle (phone/email) or a "
+            "contact display name (read from AddressBook, no osascript)."
+        ),
     ),
 ) -> None:
-    """List contact handles (phone numbers / emails) seen in the message store."""
+    """List contacts — handles seen in the message store, plus AddressBook
+    name matches for `-q` — with resolved display names where known."""
     try:
         rows = imessage.list_contacts(limit=limit, query=query)
     except imessage.AccessError as exc:
@@ -232,9 +244,9 @@ def contacts(
     if not rows:
         ui.console.print("(no contacts)" if not query else f"(no contacts matching {query!r})")
         return
-    table = ui.styled_table("Contacts", ["handle", "service"])
+    table = ui.styled_table("Contacts", ["name", "handle", "service"])
     for c in rows:
-        table.add_row(c.handle, c.service or "")
+        table.add_row(c.name or "", c.handle, c.service or "")
     ui.console.print(table)
     ui.console.print(
         f"[dim]{len(rows)} handle(s)"
@@ -313,15 +325,21 @@ def search(
         "\b\n"
         "Examples:\n"
         "  imsg send +14155551234 \"on my way\"\n"
-        "  imsg send someone@example.com \"ping\"\n\n"
+        "  imsg send someone@example.com \"ping\"\n"
+        "  imsg send \"Joseph Heupler\" \"ping\"   # resolves via AddressBook\n\n"
         "Side effect: delivers a real message via Messages.app.\n"
+        "A name is only sent if it resolves to exactly one contact; ambiguous\n"
+        "or unmatched names error out and nothing is sent.\n"
         "Pick a recipient from `imsg contacts`."
     ),
 )
 def send(
     recipient: str = typer.Argument(
         ...,
-        help="Destination handle: phone number or email (see `imsg contacts`).",
+        help=(
+            "Destination: a handle (phone/email, see `imsg contacts`) or a "
+            "contact name that resolves to exactly one person."
+        ),
     ),
     text: str = typer.Argument(..., help="Message body to send."),
 ) -> None:

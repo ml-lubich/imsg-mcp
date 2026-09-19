@@ -139,3 +139,144 @@ def test_read_messages_filter_by_chat_id(synthetic_db: Path):
     chat_id = imessage.list_chats(path=synthetic_db, limit=1)[0].chat_id
     msgs = imessage.read_messages(chat_id=chat_id, path=synthetic_db, limit=10)
     assert msgs
+
+
+# --- name resolution (AddressBook) -----------------------------------------
+
+
+def test_find_contacts_by_name_exact(addressbook_db: Path):
+    matches = imessage.find_contacts_by_name("Joseph Heupler", db_paths=[addressbook_db])
+    assert matches == [("Joseph Heupler", ["+16262344927"])]
+
+
+def test_find_contacts_by_name_case_insensitive(addressbook_db: Path):
+    matches = imessage.find_contacts_by_name("heupler", db_paths=[addressbook_db])
+    assert matches == [("Joseph Heupler", ["+16262344927"])]
+
+
+def test_find_contacts_by_name_partial(addressbook_db: Path):
+    matches = imessage.find_contacts_by_name("Heup", db_paths=[addressbook_db])
+    assert [n for n, _ in matches] == ["Joseph Heupler"]
+
+
+def test_find_contacts_by_name_ambiguous(addressbook_db: Path):
+    matches = imessage.find_contacts_by_name("Jose", db_paths=[addressbook_db])
+    assert {n for n, _ in matches} == {"Jose Alvarez", "Jose Ramirez", "Joseph Heupler"}
+
+
+def test_find_contacts_by_name_none(addressbook_db: Path):
+    assert imessage.find_contacts_by_name("Nobody Here", db_paths=[addressbook_db]) == []
+
+
+def test_find_contacts_by_name_empty_query(addressbook_db: Path):
+    assert imessage.find_contacts_by_name("  ", db_paths=[addressbook_db]) == []
+
+
+def test_find_contacts_by_name_phone_normalisation(addressbook_db: Path):
+    # "(626) 234-4927" -> +16262344927, matching chat.db's handle format.
+    matches = imessage.find_contacts_by_name("Joseph", db_paths=[addressbook_db])
+    assert matches == [("Joseph Heupler", ["+16262344927"])]
+
+
+def test_find_contacts_by_name_email_handle(addressbook_db: Path):
+    matches = imessage.find_contacts_by_name("Alvarez", db_paths=[addressbook_db])
+    assert matches == [("Jose Alvarez", ["jose.alvarez@example.com"])]
+
+
+def test_find_contacts_by_name_no_handle_contact_omitted(addressbook_db: Path):
+    # "NoHandle Person" has no phone/email -> not a usable send target.
+    assert imessage.find_contacts_by_name("NoHandle", db_paths=[addressbook_db]) == []
+
+
+def test_find_contacts_by_name_missing_db_ignored(tmp_path: Path):
+    assert imessage.find_contacts_by_name("anyone", db_paths=[tmp_path / "nope.abcddb"]) == []
+
+
+def test_list_contacts_by_name_merges_and_dedupes(
+    synthetic_db: Path, addressbook_db: Path
+):
+    rows = imessage.list_contacts(
+        path=synthetic_db, addressbook_paths=[addressbook_db], query="Heupler"
+    )
+    assert rows == [imessage.Contact("+16262344927", None, "Joseph Heupler")]
+
+
+def test_list_contacts_query_without_name_match_falls_back_to_handle_search(
+    synthetic_db: Path, addressbook_db: Path
+):
+    handle = imessage.list_contacts(path=synthetic_db, limit=1)[0].handle
+    needle = handle[:3]
+    rows = imessage.list_contacts(
+        path=synthetic_db, addressbook_paths=[addressbook_db], query=needle
+    )
+    assert rows and all(c.name is None for c in rows)
+
+
+def test_pick_imessage_handle_single_handle_short_circuits():
+    assert imessage._pick_imessage_handle(["+1"]) == "+1"
+
+
+def test_pick_imessage_handle_prefers_known_imessage(synthetic_db: Path):
+    known = imessage.list_contacts(path=synthetic_db, limit=1)[0].handle
+    picked = imessage._pick_imessage_handle(
+        [known, "unknown@example.com"], path=synthetic_db
+    )
+    assert picked == known
+
+
+def test_resolve_recipient_passthrough_for_phone_and_email():
+    assert imessage.resolve_recipient("+14155551234") == "+14155551234"
+    assert imessage.resolve_recipient("a@example.com") == "a@example.com"
+
+
+def test_resolve_recipient_by_name(addressbook_db: Path):
+    resolved = imessage.resolve_recipient(
+        "Joseph Heupler", addressbook_paths=[addressbook_db]
+    )
+    assert resolved == "+16262344927"
+
+
+def test_resolve_recipient_ambiguous_raises(addressbook_db: Path):
+    with pytest.raises(ValueError, match="ambiguous"):
+        imessage.resolve_recipient("Jose", addressbook_paths=[addressbook_db])
+
+
+def test_resolve_recipient_no_match_raises(addressbook_db: Path):
+    with pytest.raises(ValueError, match="no contact"):
+        imessage.resolve_recipient("Nobody", addressbook_paths=[addressbook_db])
+
+
+def test_send_message_resolves_single_match(monkeypatch, addressbook_db: Path):
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    imessage.send_message("Joseph Heupler", "hi", addressbook_paths=[addressbook_db])
+    assert "+16262344927" in captured["cmd"][2]
+
+
+def test_send_message_refuses_ambiguous_name(monkeypatch, addressbook_db: Path):
+    called = {"n": 0}
+
+    def fake_run(cmd, **kwargs):
+        called["n"] += 1
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    with pytest.raises(ValueError, match="ambiguous"):
+        imessage.send_message("Jose", "hi", addressbook_paths=[addressbook_db])
+    assert called["n"] == 0
+
+
+def test_send_message_refuses_no_match(monkeypatch, addressbook_db: Path):
+    called = {"n": 0}
+    monkeypatch.setattr(
+        subprocess, "run",
+        lambda cmd, **kw: called.__setitem__("n", called["n"] + 1),
+    )
+    with pytest.raises(ValueError, match="no contact"):
+        imessage.send_message("Nobody", "hi", addressbook_paths=[addressbook_db])
+    assert called["n"] == 0

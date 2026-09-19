@@ -70,6 +70,29 @@ def test_contacts_renders(monkeypatch):
     assert "handle" in result.stdout.lower() or "Contacts" in result.stdout
 
 
+def test_contacts_renders_name_column(monkeypatch):
+    monkeypatch.setattr(
+        imessage, "list_contacts",
+        lambda limit=100, query=None: [
+            imessage.Contact("+16262344927", None, "Joseph Heupler"),
+        ],
+    )
+    result = runner.invoke(main.app, ["contacts", "-q", "Heupler"])
+    assert result.exit_code == 0
+    assert "Joseph Heupler" in result.stdout
+    assert "+16262344927" in result.stdout
+
+
+def test_send_name_ambiguous_exits_nonzero(monkeypatch):
+    def boom(r, t):
+        raise ValueError("ambiguous name 'Jose', matches: Jose A (...); Jose R (...)")
+
+    monkeypatch.setattr(imessage, "send_message", boom)
+    result = runner.invoke(main.app, ["send", "Jose", "hi"])
+    assert result.exit_code == 1
+    assert "ambiguous" in result.stdout
+
+
 def test_contacts_query_forwarded(monkeypatch):
     seen: dict[str, object] = {}
 
