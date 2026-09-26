@@ -666,7 +666,7 @@ def send_message(
 ) -> None:
     """Send an iMessage/SMS to a handle (phone number or email) via Messages.app.
 
-    `recipient` may also be a contact name (e.g. "Joseph Heupler"); it is
+    `recipient` may also be a contact name (e.g. "Jordan Rivera"); it is
     resolved via `resolve_recipient` to exactly one handle before anything is
     sent — an ambiguous or unmatched name raises ValueError and never sends.
 

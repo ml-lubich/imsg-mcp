@@ -62,7 +62,7 @@ def list_contacts(limit: int = 100, query: str | None = None) -> list[dict]:
     plus AddressBook name matches for `query`.
 
     `query` case-insensitively matches a handle substring (e.g. \"415\" or
-    \"@example.com\") OR a contact's display name (e.g. \"Heupler\") — read
+    \"@example.com\") OR a contact's display name (e.g. \"Rivera\") — read
     straight from the local AddressBook, no Contacts.app automation needed.
     Named matches carry `name`; use returned handles with
     `get_recent_messages(contact=...)` or `send_message(recipient=...)`.

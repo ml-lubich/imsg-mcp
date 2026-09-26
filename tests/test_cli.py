@@ -74,13 +74,13 @@ def test_contacts_renders_name_column(monkeypatch):
     monkeypatch.setattr(
         imessage, "list_contacts",
         lambda limit=100, query=None: [
-            imessage.Contact("+16262344927", None, "Joseph Heupler"),
+            imessage.Contact("+15550101234", None, "Jordan Rivera"),
         ],
     )
-    result = runner.invoke(main.app, ["contacts", "-q", "Heupler"])
+    result = runner.invoke(main.app, ["contacts", "-q", "Rivera"])
     assert result.exit_code == 0
-    assert "Joseph Heupler" in result.stdout
-    assert "+16262344927" in result.stdout
+    assert "Jordan Rivera" in result.stdout
+    assert "+15550101234" in result.stdout
 
 
 def test_send_name_ambiguous_exits_nonzero(monkeypatch):

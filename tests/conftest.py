@@ -36,7 +36,7 @@ def addressbook_db(tmp_path: Path) -> Path:
     conn.executemany(
         "INSERT INTO ZABCDRECORD (Z_PK, ZFIRSTNAME, ZLASTNAME) VALUES (?,?,?)",
         [
-            (1, "Joseph", "Heupler"),
+            (1, "Jordan", "Rivera"),
             (2, "Jose", "Ramirez"),
             (3, "Jose", "Alvarez"),
             (4, "NoHandle", "Person"),
@@ -45,7 +45,7 @@ def addressbook_db(tmp_path: Path) -> Path:
     conn.executemany(
         "INSERT INTO ZABCDPHONENUMBER (ZOWNER, ZFULLNUMBER) VALUES (?,?)",
         [
-            (1, "(626) 234-4927"),
+            (1, "(555) 010-1234"),
             (2, "+1 415-555-0100"),
         ],
     )

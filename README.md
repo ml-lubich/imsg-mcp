@@ -99,7 +99,7 @@ imsg doctor                       # check Full Disk Access + engine
 imsg chats                        # recent conversations + their ids
 imsg contacts                     # handles (numbers / emails) seen
 imsg contacts -q 415              # filter handles by substring
-imsg contacts -q Heupler          # or by AddressBook display name
+imsg contacts -q Rivera          # or by AddressBook display name
 imsg read -c +14155551234         # recent messages with a contact
 imsg read --chat 42 --limit 100   # a specific conversation
 imsg search "dinner"              # search message text
@@ -107,7 +107,7 @@ imsg attachments -c +14155551234  # list media/files with on-disk paths
 imsg attachments -k audio         # only audio (image / video / application too)
 imsg download -k image -o ./media # copy media out to a folder
 imsg send +14155551234 "on my way"
-imsg send "Joseph Heupler" "on my way"  # resolves to one contact, or errors
+imsg send "Jordan Rivera" "on my way"  # resolves to one contact, or errors
 imsg version                      # installed package version
 imsg agent schema                 # JSON schema of every stable command
 imsg agent guide                  # markdown playbook for LLM agents

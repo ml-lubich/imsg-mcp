@@ -26,13 +26,13 @@ Agent-friendly discovery:
 Examples:
   imsg contacts --limit 50
   imsg contacts -q 415
-  imsg contacts -q Heupler
+  imsg contacts -q Rivera
   imsg read -c +14155551234 --limit 20
   imsg search "dinner" --limit 10
   imsg attachments -c +14155551234 --kind image
   imsg download -c +14155551234 -k image -o ~/Desktop/media
   imsg send +14155551234 "on my way"
-  imsg send "Joseph Heupler" "on my way"
+  imsg send "Jordan Rivera" "on my way"
 """
 
 app = typer.Typer(
@@ -81,14 +81,14 @@ Commands:
 Examples:
   imsg contacts --limit 50
   imsg contacts -q 415
-  imsg contacts -q Heupler
+  imsg contacts -q Rivera
   imsg read -c +14155551234 --limit 20
   imsg read --chat 42
   imsg search "dinner" --limit 10
   imsg attachments -c +14155551234 --kind image
   imsg download -c +14155551234 -k image -o ~/Desktop/media
   imsg send +14155551234 "on my way"
-  imsg send "Joseph Heupler" "on my way"
+  imsg send "Jordan Rivera" "on my way"
 
 KIND is a mime-type prefix: image, audio, video, application.
 
@@ -212,7 +212,7 @@ def chats(
         "  imsg contacts --limit 200\n"
         "  imsg contacts -q 415\n"
         "  imsg contacts -q @example.com\n"
-        "  imsg contacts -q Heupler          # match by AddressBook name\n\n"
+        "  imsg contacts -q Rivera          # match by AddressBook name\n\n"
         "Use a handle with `imsg read -c <handle>` or `imsg send <handle> \"...\"`.\n"
         "MCP equivalent: tool `list_contacts`."
     ),
@@ -326,7 +326,7 @@ def search(
         "Examples:\n"
         "  imsg send +14155551234 \"on my way\"\n"
         "  imsg send someone@example.com \"ping\"\n"
-        "  imsg send \"Joseph Heupler\" \"ping\"   # resolves via AddressBook\n\n"
+        "  imsg send \"Jordan Rivera\" \"ping\"   # resolves via AddressBook\n\n"
         "Side effect: delivers a real message via Messages.app.\n"
         "A name is only sent if it resolves to exactly one contact; ambiguous\n"
         "or unmatched names error out and nothing is sent.\n"

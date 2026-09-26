@@ -145,23 +145,23 @@ def test_read_messages_filter_by_chat_id(synthetic_db: Path):
 
 
 def test_find_contacts_by_name_exact(addressbook_db: Path):
-    matches = imessage.find_contacts_by_name("Joseph Heupler", db_paths=[addressbook_db])
-    assert matches == [("Joseph Heupler", ["+16262344927"])]
+    matches = imessage.find_contacts_by_name("Jordan Rivera", db_paths=[addressbook_db])
+    assert matches == [("Jordan Rivera", ["+15550101234"])]
 
 
 def test_find_contacts_by_name_case_insensitive(addressbook_db: Path):
-    matches = imessage.find_contacts_by_name("heupler", db_paths=[addressbook_db])
-    assert matches == [("Joseph Heupler", ["+16262344927"])]
+    matches = imessage.find_contacts_by_name("rivera", db_paths=[addressbook_db])
+    assert matches == [("Jordan Rivera", ["+15550101234"])]
 
 
 def test_find_contacts_by_name_partial(addressbook_db: Path):
-    matches = imessage.find_contacts_by_name("Heup", db_paths=[addressbook_db])
-    assert [n for n, _ in matches] == ["Joseph Heupler"]
+    matches = imessage.find_contacts_by_name("Riv", db_paths=[addressbook_db])
+    assert [n for n, _ in matches] == ["Jordan Rivera"]
 
 
 def test_find_contacts_by_name_ambiguous(addressbook_db: Path):
     matches = imessage.find_contacts_by_name("Jose", db_paths=[addressbook_db])
-    assert {n for n, _ in matches} == {"Jose Alvarez", "Jose Ramirez", "Joseph Heupler"}
+    assert {n for n, _ in matches} == {"Jose Alvarez", "Jose Ramirez"}
 
 
 def test_find_contacts_by_name_none(addressbook_db: Path):
@@ -173,9 +173,9 @@ def test_find_contacts_by_name_empty_query(addressbook_db: Path):
 
 
 def test_find_contacts_by_name_phone_normalisation(addressbook_db: Path):
-    # "(626) 234-4927" -> +16262344927, matching chat.db's handle format.
-    matches = imessage.find_contacts_by_name("Joseph", db_paths=[addressbook_db])
-    assert matches == [("Joseph Heupler", ["+16262344927"])]
+    # "(555) 010-1234" -> +15550101234, matching chat.db's handle format.
+    matches = imessage.find_contacts_by_name("Jordan", db_paths=[addressbook_db])
+    assert matches == [("Jordan Rivera", ["+15550101234"])]
 
 
 def test_find_contacts_by_name_email_handle(addressbook_db: Path):
@@ -196,9 +196,9 @@ def test_list_contacts_by_name_merges_and_dedupes(
     synthetic_db: Path, addressbook_db: Path
 ):
     rows = imessage.list_contacts(
-        path=synthetic_db, addressbook_paths=[addressbook_db], query="Heupler"
+        path=synthetic_db, addressbook_paths=[addressbook_db], query="Rivera"
     )
-    assert rows == [imessage.Contact("+16262344927", None, "Joseph Heupler")]
+    assert rows == [imessage.Contact("+15550101234", None, "Jordan Rivera")]
 
 
 def test_list_contacts_query_without_name_match_falls_back_to_handle_search(
@@ -231,9 +231,9 @@ def test_resolve_recipient_passthrough_for_phone_and_email():
 
 def test_resolve_recipient_by_name(addressbook_db: Path):
     resolved = imessage.resolve_recipient(
-        "Joseph Heupler", addressbook_paths=[addressbook_db]
+        "Jordan Rivera", addressbook_paths=[addressbook_db]
     )
-    assert resolved == "+16262344927"
+    assert resolved == "+15550101234"
 
 
 def test_resolve_recipient_ambiguous_raises(addressbook_db: Path):
@@ -254,8 +254,8 @@ def test_send_message_resolves_single_match(monkeypatch, addressbook_db: Path):
         return subprocess.CompletedProcess(cmd, 0, "", "")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
-    imessage.send_message("Joseph Heupler", "hi", addressbook_paths=[addressbook_db])
-    assert "+16262344927" in captured["cmd"][2]
+    imessage.send_message("Jordan Rivera", "hi", addressbook_paths=[addressbook_db])
+    assert "+15550101234" in captured["cmd"][2]
 
 
 def test_send_message_refuses_ambiguous_name(monkeypatch, addressbook_db: Path):
