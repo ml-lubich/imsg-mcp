@@ -248,3 +248,52 @@ def test_send_failure_exits_nonzero(monkeypatch):
     result = runner.invoke(main.app, ["send", "+1", "hi"])
     assert result.exit_code == 1
     assert "refused" in result.stdout
+
+
+def test_send_verify_delivered(monkeypatch):
+    monkeypatch.setattr(
+        imessage,
+        "send_message",
+        lambda r, t, verify=False, verify_timeout=8.0: {
+            "is_sent": True,
+            "is_delivered": True,
+            "error": 0,
+            "recipient": r,
+        },
+    )
+    result = runner.invoke(main.app, ["send", "+14155551234", "hi", "--verify"])
+    assert result.exit_code == 0
+    assert "delivered" in result.stdout
+
+
+def test_send_verify_dispatched(monkeypatch):
+    monkeypatch.setattr(
+        imessage,
+        "send_message",
+        lambda r, t, verify=False, verify_timeout=8.0: {
+            "is_sent": True,
+            "is_delivered": False,
+            "error": 0,
+            "recipient": r,
+        },
+    )
+    result = runner.invoke(main.app, ["send", "+14155551234", "hi", "--verify"])
+    assert result.exit_code == 0
+    assert "dispatched" in result.stdout
+
+
+def test_send_verify_error(monkeypatch):
+    monkeypatch.setattr(
+        imessage,
+        "send_message",
+        lambda r, t, verify=False, verify_timeout=8.0: {
+            "is_sent": False,
+            "is_delivered": False,
+            "error": 4,
+            "recipient": r,
+        },
+    )
+    result = runner.invoke(main.app, ["send", "+14155551234", "hi", "--verify"])
+    assert result.exit_code == 0
+    assert "send error code: 4" in result.stdout
+

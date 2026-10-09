@@ -115,14 +115,30 @@ def download_attachments(
 
 
 @mcp.tool()
-def send_message(recipient: str, text: str) -> str:
+def send_message(recipient: str, text: str, verify: bool = False) -> str:
     """Send an iMessage/SMS to a handle (phone number or email) or a contact
     name. A name is resolved via AddressBook and only sent if it matches
     exactly one contact — ambiguous or unmatched names raise an error and
     nothing is sent. Has a side effect: delivers a real message via
-    Messages.app. Prefer a handle from `list_contacts` when in doubt."""
-    imessage.send_message(recipient, text)
+    Messages.app.
+    
+    When `verify=True`, checks chat.db that the message was saved,
+    dispatched, and delivered."""
+    if verify:
+        verif = imessage.send_message(recipient, text, verify=True)
+    else:
+        verif = imessage.send_message(recipient, text)
+    if verify and verif:
+        if verif.get("is_delivered"):
+            return f"sent and delivered to {recipient}"
+        if verif.get("is_sent"):
+            return f"sent to {recipient} (awaiting delivery receipt)"
+        if verif.get("error"):
+            return f"error sending to {recipient} (error code: {verif['error']})"
+        return f"sent to {recipient} ({verif.get('note', 'unverified')})"
     return f"sent to {recipient}"
+
+
 
 
 def main() -> None:

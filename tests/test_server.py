@@ -71,6 +71,30 @@ def test_send_message_tool(monkeypatch):
     assert seen == {"recipient": "+1", "text": "ping"}
 
 
+def test_send_message_tool_verify(monkeypatch):
+    monkeypatch.setattr(
+        imessage,
+        "send_message",
+        lambda r, t, verify=False: {"is_sent": True, "is_delivered": True, "error": 0},
+    )
+    assert "delivered" in server.send_message("+1", "ping", verify=True)
+
+    monkeypatch.setattr(
+        imessage,
+        "send_message",
+        lambda r, t, verify=False: {"is_sent": True, "is_delivered": False, "error": 0},
+    )
+    assert "awaiting delivery" in server.send_message("+1", "ping", verify=True)
+
+    monkeypatch.setattr(
+        imessage,
+        "send_message",
+        lambda r, t, verify=False: {"is_sent": False, "is_delivered": False, "error": 3},
+    )
+    assert "error code: 3" in server.send_message("+1", "ping", verify=True)
+
+
+
 def test_main_invokes_mcp_run(monkeypatch):
     called = {"n": 0}
     monkeypatch.setattr(server.mcp, "run", lambda: called.__setitem__("n", called["n"] + 1))

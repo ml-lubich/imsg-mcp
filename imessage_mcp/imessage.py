@@ -663,16 +663,19 @@ def send_message(
     text: str,
     path: Path | None = None,
     addressbook_paths: list[Path] | None = None,
-) -> None:
+    verify: bool = False,
+    verify_timeout: float = 8.0,
+) -> dict[str, Any] | None:
     """Send an iMessage/SMS to a handle (phone number or email) via Messages.app.
 
     `recipient` may also be a contact name (e.g. "Jordan Rivera"); it is
     resolved via `resolve_recipient` to exactly one handle before anything is
     sent — an ambiguous or unmatched name raises ValueError and never sends.
 
-    Tries the iMessage service first; Messages falls back to SMS for handles
-    that aren't on iMessage when the account allows it.
+    When `verify=True`, checks chat.db for the sent message, verifying that
+    `is_sent=1`, checking `is_delivered`, and confirming `error=0`.
     """
+    import time
     if not recipient or not text:
         raise ValueError("recipient and text are required")
     recipient = resolve_recipient(recipient, path=path, addressbook_paths=addressbook_paths)
@@ -686,3 +689,56 @@ def send_message(
     end tell
     '''
     _osascript(script)
+
+    if not verify:
+        return None
+
+    deadline = time.time() + verify_timeout
+    last_res = None
+    while time.time() < deadline:
+        time.sleep(0.5)
+        try:
+            conn = _connect(path)
+            try:
+                # Query newest sent message for recipient
+                cur = conn.execute(
+                    """
+                    SELECT m.ROWID, m.date, m.is_sent, m.is_delivered, m.error,
+                           m.date_delivered, m.date_read, m.service
+                    FROM message m
+                    LEFT JOIN handle h ON h.ROWID = m.handle_id
+                    WHERE m.is_from_me = 1 AND (h.id = ? OR h.id LIKE ?)
+                    ORDER BY m.date DESC LIMIT 1
+                    """,
+                    (recipient, f"%{recipient.lstrip('+')}%"),
+                )
+                row = cur.fetchone()
+                if row:
+                    rowid, date, is_sent, is_deliv, err, dt_deliv, dt_read, srv = row
+                    last_res = {
+                        "rowid": rowid,
+                        "recipient": recipient,
+                        "is_sent": bool(is_sent),
+                        "is_delivered": bool(is_deliv),
+                        "error": err,
+                        "service": srv,
+                        "date_delivered": _apple_time_to_iso(dt_deliv),
+                        "date_read": _apple_time_to_iso(dt_read),
+                    }
+                    if is_sent and (is_deliv or err != 0):
+                        break
+            finally:
+                conn.close()
+        except AccessError:
+            break
+
+    if last_res:
+        return last_res
+    return {
+        "recipient": recipient,
+        "is_sent": False,
+        "is_delivered": False,
+        "error": 0,
+        "note": "verification timed out waiting for chat.db entry",
+    }
+
