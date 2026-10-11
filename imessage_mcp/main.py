@@ -343,10 +343,10 @@ def send(
     ),
     text: str = typer.Argument(..., help="Message body to send."),
     verify: bool = typer.Option(
-        False,
-        "--verify",
-        "-v",
-        help="Wait and verify in chat.db that the message was recorded, sent, and delivered.",
+        True,
+        "--verify/--no-verify",
+        "-v/-V",
+        help="Wait and verify in chat.db that the message was recorded, sent, and delivered (ON by default).",
     ),
     timeout: float = typer.Option(
         8.0,
@@ -357,10 +357,7 @@ def send(
 ) -> None:
     """Send an iMessage/SMS to a handle (phone number or email)."""
     try:
-        if verify:
-            verif = imessage.send_message(recipient, text, verify=True, verify_timeout=timeout)
-        else:
-            verif = imessage.send_message(recipient, text)
+        verif = imessage.send_message(recipient, text, verify=verify, verify_timeout=timeout)
     except (ValueError, RuntimeError) as exc:
         _fail(str(exc))
     if verify and verif:
@@ -372,9 +369,9 @@ def send(
             ui.console.print(ui.badge("down"), f"to {recipient} (send error code: {verif['error']})")
         else:
             ui.console.print(ui.badge("sent"), f"to {recipient} [dim]({verif.get('note', 'unverified')})[/dim]")
-
     else:
         ui.console.print(ui.badge("sent"), f"to {recipient}")
+
 
 
 

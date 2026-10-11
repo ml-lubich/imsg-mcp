@@ -84,7 +84,7 @@ def test_contacts_renders_name_column(monkeypatch):
 
 
 def test_send_name_ambiguous_exits_nonzero(monkeypatch):
-    def boom(r, t):
+    def boom(r, t, **kwargs):
         raise ValueError("ambiguous name 'Jose', matches: Jose A (...); Jose R (...)")
 
     monkeypatch.setattr(imessage, "send_message", boom)
@@ -110,7 +110,7 @@ def test_contacts_query_forwarded(monkeypatch):
 
 def test_send_reports_sent(monkeypatch):
     sent = {}
-    monkeypatch.setattr(imessage, "send_message", lambda r, t: sent.update(r=r, t=t))
+    monkeypatch.setattr(imessage, "send_message", lambda r, t, **kwargs: sent.update(r=r, t=t))
     result = runner.invoke(main.app, ["send", "+14155551234", "hello"])
     assert result.exit_code == 0 and sent == {"r": "+14155551234", "t": "hello"}
 
@@ -241,7 +241,7 @@ def test_search_access_error(monkeypatch):
 
 
 def test_send_failure_exits_nonzero(monkeypatch):
-    def boom(r, t):
+    def boom(r, t, **kwargs):
         raise RuntimeError("Messages.app refused")
 
     monkeypatch.setattr(imessage, "send_message", boom)

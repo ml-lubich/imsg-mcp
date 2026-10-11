@@ -663,7 +663,7 @@ def send_message(
     text: str,
     path: Path | None = None,
     addressbook_paths: list[Path] | None = None,
-    verify: bool = False,
+    verify: bool = True,
     verify_timeout: float = 8.0,
 ) -> dict[str, Any] | None:
     """Send an iMessage/SMS to a handle (phone number or email) via Messages.app.

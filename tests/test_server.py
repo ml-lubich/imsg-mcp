@@ -63,12 +63,20 @@ def test_search_messages_tool(monkeypatch):
 
 
 def test_send_message_tool(monkeypatch):
-    seen: dict[str, str] = {}
+    seen: dict[str, Any] = {}
     monkeypatch.setattr(
-        imessage, "send_message", lambda r, t: seen.update(recipient=r, text=t)
+        imessage,
+        "send_message",
+        lambda r, t, verify=True: seen.update(recipient=r, text=t, verify=verify) or {
+            "is_sent": True,
+            "is_delivered": False,
+            "error": 0,
+        },
     )
-    assert server.send_message("+1", "ping") == "sent to +1"
-    assert seen == {"recipient": "+1", "text": "ping"}
+    assert "awaiting delivery receipt" in server.send_message("+1", "ping")
+    assert seen["recipient"] == "+1" and seen["text"] == "ping"
+    assert seen["verify"] is True
+
 
 
 def test_send_message_tool_verify(monkeypatch):
